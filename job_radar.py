@@ -31,7 +31,7 @@ STRONG_KEYWORDS = [
     "zbrush", "maya", "blender", "cinema 4d", "c4d", "houdini",
     "vfx", "cgi", "cg artist", "cg generalist", "generalist 3d",
     "sculpt", "substance painter", "marvelous designer", "motionbuilder",
-    "redshift", "unreal engine", "look dev", "lookdev",
+    "redshift", "look dev", "lookdev",
     "rigging", "rigger", "nuke", "compositing", "texturing",
     "motion design", "motion graphic", "animator",
 ]
@@ -127,7 +127,7 @@ def from_remoteok():
 def from_remotive():
     """Remotive — публічний JSON з пошуком."""
     jobs = []
-    for query in ("3d", "vfx", "animation"):
+    for query in ("3d", "vfx", "animation", "cgi", "character"):
         url = "https://remotive.com/api/remote-jobs?" + urllib.parse.urlencode(
             {"search": query})
         raw = http_get(url)
@@ -194,7 +194,77 @@ def from_weworkremotely():
     return jobs
 
 
-SOURCES = [from_remoteok, from_remotive, from_weworkremotely]
+def from_arbeitnow():
+    """Arbeitnow — публічний JSON, багато європейських вакансій."""
+    jobs = []
+    raw = http_get("https://www.arbeitnow.com/api/job-board-api")
+    if not raw:
+        return jobs
+    try:
+        data = json.loads(raw.decode("utf-8", "replace"))
+    except Exception as e:
+        print(f"[warn] Arbeitnow: поганий JSON: {e}")
+        return jobs
+    for item in data.get("data", []):
+        title = item.get("title") or ""
+        company = item.get("company_name") or ""
+        tags = " ".join(item.get("tags", []) or [])
+        location = item.get("location") or ("Remote" if item.get("remote") else "")
+        url = item.get("url") or ""
+        if not url:
+            continue
+        haystack = f"{title} {company} {tags}"
+        if matches(haystack):
+            jobs.append({
+                "id": url,
+                "title": title.strip(),
+                "company": company.strip(),
+                "location": location.strip() or "Remote",
+                "url": url,
+                "source": "Arbeitnow",
+            })
+    return jobs
+
+
+def from_jobicy():
+    """Jobicy — публічний JSON remote-вакансій."""
+    jobs = []
+    raw = http_get("https://jobicy.com/api/v2/remote-jobs?count=100")
+    if not raw:
+        return jobs
+    try:
+        data = json.loads(raw.decode("utf-8", "replace"))
+    except Exception as e:
+        print(f"[warn] Jobicy: поганий JSON: {e}")
+        return jobs
+    for item in data.get("jobs", []):
+        title = item.get("jobTitle") or ""
+        company = item.get("companyName") or ""
+        industry = " ".join(item.get("jobIndustry", []) or [])
+        location = item.get("jobGeo") or "Remote"
+        url = item.get("url") or ""
+        if not url:
+            continue
+        haystack = f"{title} {company} {industry}"
+        if matches(haystack):
+            jobs.append({
+                "id": url,
+                "title": title.strip(),
+                "company": company.strip(),
+                "location": location.strip(),
+                "url": url,
+                "source": "Jobicy",
+            })
+    return jobs
+
+
+SOURCES = [
+    from_remoteok,
+    from_remotive,
+    from_weworkremotely,
+    from_arbeitnow,
+    from_jobicy,
+]
 
 
 # ========================= telegram =========================
